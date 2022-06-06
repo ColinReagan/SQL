@@ -1,0 +1,238 @@
+SUBQUERIES:
+
+use streamersfinal;
+
+SELECT streamers.Online_Alias, statistics.Avg_Viewers, income.Monthly_Income, previous_platforms.Switched_To
+FROM streamersfinal.streamers
+INNER JOIN statistics ON statistics.Streamer_ID = streamers.Streamer_ID
+INNER JOIN income ON income.Streamer_ID = streamers.Streamer_ID
+INNER JOIN previous_platforms ON previous_platforms.Streamer_ID = streamers.Streamer_ID
+
+SELECT streamer_ID, Avg_Viewers, Avg_Monthly_Subscribers
+FROM statistics
+WHERE Avg_Monthly_Subscribers >
+	(SELECT AVG(Avg_Viewers)
+    FROM statistics)
+ORDER BY Streamer_ID
+
+use streamersfinal;
+
+SELECT Online_Alias
+FROM streamers
+WHERE Country IN
+	(SELECT Country FROM streamers
+    WHERE Country = 'Canada'
+    );
+
+use streamersfinal;
+
+SELECT Online_Alias
+FROM streamers
+WHERE Country NOT IN
+	(SELECT Country FROM streamers
+    WHERE Country = 'Canada'
+    );
+
+VIEWS:
+
+CREATE VIEW Start_Year AS 
+	SELECT First_Name, Last_Name, Online_Alias, Year_Started
+    FROM streamers
+
+CREATE VIEW Specific_Year AS 
+	SELECT First_Name, Last_Name, Online_Alias, Year_Started
+    FROM streamers
+    WHERE Year_Started = 2018
+WITH CHECK OPTION
+
+CREATE VIEW Top_10 AS 
+	SELECT Streamer_ID, Monthly_Income
+    FROM income
+    WHERE Monthly_Income > 50000
+    LIMIT 10;
+
+CREATE VIEW income_summary AS
+	SELECT streamers.Streamer_ID, Online_Alias,
+	COUNT(15) AS income_count,
+	SUM(Yearly_Income) AS 'Yearly Income Sum'
+	FROM streamers
+	JOIN income ON income.Streamer_ID = streamers.Streamer_ID
+
+UPDATE start_year
+SET Year_Started = 2017
+WHERE Online_Alias = 'xQcOW'
+
+CREATE VIEW Top_10 AS 
+	SELECT Streamer_ID, Monthly_Income
+    FROM income
+    WHERE Monthly_Income > 50000
+    LIMIT 10;
+
+INDEXES:
+
+CREATE INDEX idx_lastname
+ON streamers (Last_Name)
+
+SHOW INDEX
+FROM streamers;
+
+PROCEDURES:
+
+CREATE PROCEDURE platform_identification()
+BEGIN
+SELECT Streamer_ID, Online_Alias, Platform_ID,
+	CASE Platform_ID
+    WHEN 1 THEN 'Twitch'
+    WHEN 2 THEN 'YouTube'
+    WHEN 3 THEN 'Facebook'
+    END AS Platform
+    FROM streamers;
+END//
+
+DELIMITER ;
+
+CALL platform_identification();
+
+use streamersfinal;
+
+DELIMITER //
+
+CREATE PROCEDURE top_streamer_check()
+BEGIN
+DECLARE Total_Monthly_Revenue DECIMAL(9, 2);
+
+SELECT SUM(Subscriber_Revenue + Ad_Revenue)
+INTO Total_Monthly_Revenue
+FROM income
+WHERE Income_ID = 12;
+
+IF Total_Monthly_Revenue < 50000 THEN
+		SELECT CONCAT('Sorry, you are not in the top percentage of streamers with: $', Total_Monthly_Revenue, ' amount') AS message;
+    ELSE
+		SELECT 'You are in the top percentage of streamers' AS message;
+    END IF;
+END//
+
+DELIMITER ;
+
+CALL top_streamer_check();
+
+
+use streamersfinal;
+
+DELIMITER //
+
+CREATE PROCEDURE duplicate_entry()
+BEGIN
+	DECLARE duplicate_entry_for_key TINYINT DEFAULT FALSE;
+		BEGIN
+		DECLARE EXIT HANDLER FOR 1062
+		SET duplicate_entry_for_key = TRUE;
+	INSERT INTO streamers VALUES (1, 'Felix', 'Lengyel', 'xQcOW', 'xqc@evolved.gg', 'Canada', 2016, 1);
+    
+    SELECT '1 row was inserted.' AS message;
+    END;
+    
+    IF duplicate_entry_for_key = TRUE THEN
+		SELECT 'Row was not inserted - duplicate key encountered.' AS message;
+	END IF;
+END//
+
+DELIMITER ;
+
+CALL duplicate_entry();
+
+se streamersfinal;
+
+DELIMITER //
+
+CREATE PROCEDURE transaction_test()
+BEGIN
+	DECLARE sql_error TINYINT DEFAULT FALSE;
+    
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+		SET sql_error = TRUE;
+        
+	START TRANSACTION;
+    
+    INSERT INTO income
+    VALUES (16, 16, 15864, 94820, 283490, 1933, 15843, 3);
+    
+    IF sql_error = FALSE THEN
+		COMMIT;
+        SELECT 'The transaction was comitted.';
+	ELSE
+		ROLLBACK;
+        SELECT 'The transaction was rolled back.';
+        END IF;
+END//
+
+DELIMITER ;
+
+CALL transaction_test();
+
+TRIGGER:
+
+use streamersfinal;
+
+DELIMITER // 
+
+CREATE TRIGGER lower_case_platform
+	BEFORE UPDATE ON  platforms
+    FOR EACH ROW
+BEGIN
+	SET NEW.Platform_Name = LOWER(NEW.Platform_Name);
+END//
+
+UPDATE platforms
+SET Platform_Name = 'Youtube'
+WHERE Platform_ID = 2
+
+USE streamersfinal;
+
+CREATE TABLE platforms_audit
+(
+platform_ID		INT 	NOT NULL,
+platform_name	VARCHAR(50)		NOT NULL,
+action_type		VARCHAR(50)		NOT NULL,
+action_date		DATETIME		NOT NULL
+)
+
+DELIMITER //
+
+CREATE TRIGGER lowercase_after_insert
+	AFTER INSERT ON platforms
+    FOR EACH ROW
+BEGIN
+	INSERT INTO platforms_audit VALUES
+    (NEW.platform_ID, NEW.platform_name, 'INSERTED', NOW());
+END //
+
+INSERT INTO platforms VALUES
+(4, 'Instagram')
+
+ROLLBACK:
+
+use streamersfinal;
+
+SELECT * FROM streamersfinal.streamers;
+
+START TRANSACTION;
+
+SAVEPOINT before_update;
+
+INSERT INTO streamers
+VALUES (16, 'Colin', 'Reagan', 'Reagan285', 'Reagan285@gmail.com', 'United States', 2022, 1);
+
+ROLLBACK TO SAVEPOINT before_update;
+
+COMMIT;
+
+CREATE USER:
+CREATE USER ap_user@localhost IDENTIFIED BY 'root';
+
+GRANT SELECT, INSERT, UPDATE
+ON streamersfinal.*
+TO ap_user@localhost;
+
+SHOW GRANTS FOR ap_user@localhost
